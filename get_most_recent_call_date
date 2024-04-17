@@ -8,6 +8,7 @@ def main(event):
     hs_objectid = event.get('inputFields').get('hs_objectid')
 
     # First API call to get the list of calls associated with the custom object
+    # Replace 2-15529224 with the ID of your custom object
     calls_url = f"https://api.hubapi.com/crm/v3/objects/2-15529224/{hs_objectid}/associations/calls"
     headers = {"Authorization": f"Bearer {api_key}"}
     response = requests.get(calls_url, headers=headers)
