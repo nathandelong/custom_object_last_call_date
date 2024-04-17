@@ -1,0 +1,61 @@
+import os
+import requests
+from datetime import datetime
+
+def main(event):
+    # Use inputs to get data from any action in your workflow and use it in your code instead of having to use the HubSpot API.
+    api_key = os.getenv("hstoken")
+    hs_objectid = event.get('inputFields').get('hs_objectid')
+
+    # First API call to get the list of calls associated with the custom object
+    calls_url = f"https://api.hubapi.com/crm/v3/objects/2-15529224/{hs_objectid}/associations/calls"
+    headers = {"Authorization": f"Bearer {api_key}"}
+    response = requests.get(calls_url, headers=headers)
+    calls_data = response.json()
+
+    # Extracting call IDs from the response
+    call_ids = [call['id'] for call in calls_data['results']]
+
+    # Initialize variables to store the most recent call date and its ID
+    most_recent_call_date = None
+    most_recent_call_id = None
+
+    # Loop through each call ID and get the details to find the most recent one
+    for call_id in call_ids:
+        call_details_url = f"https://api.hubapi.com/crm/v3/objects/calls/{call_id}"
+        response = requests.get(call_details_url, headers=headers)
+        call_details = response.json()
+
+        # Extracting call creation date
+        call_createdate = call_details['properties']['hs_createdate']
+
+        # Removing milliseconds and timezone information
+        call_createdate = call_createdate.split('.')[0]
+
+        # Parsing the date string to datetime object
+        call_createdate_datetime = datetime.strptime(call_createdate, '%Y-%m-%dT%H:%M:%S')
+
+        # Comparing with the current most recent call date
+        if most_recent_call_date is None or call_createdate_datetime > most_recent_call_date:
+            most_recent_call_date = call_createdate_datetime
+            most_recent_call_id = call_id
+
+    # Formatting the most recent call date as YYYY-MM-DD
+    most_recent_call_date_formatted = most_recent_call_date.strftime('%Y-%m-%d')
+
+    # Make an API call to update the last_call_date property of the custom object
+    update_url = f"https://api.hubapi.com/crm/v3/objects/2-15529224/{hs_objectid}"
+    update_data = {
+        "properties": {
+            "last_call_date": most_recent_call_date_formatted
+        }
+    }
+    response = requests.patch(update_url, headers=headers, json=update_data)
+
+    # Return the output data that can be used in later actions in your workflow.
+    return {
+        "outputFields": {
+            "most_recent_call_date": most_recent_call_date_formatted,
+            "most_recent_call_id": most_recent_call_id
+        }
+    }
